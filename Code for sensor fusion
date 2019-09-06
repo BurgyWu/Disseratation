@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+
+from PIL import Image
+import matplotlib.pyplot as plt
+# Python libs
+import sys, time
+
+# numpy and scipy
+import numpy as np
+from scipy.ndimage import filters
+
+# OpenCV
+import cv2 
+
+# Ros libraries
+import roslib
+import rospy
+
+# Ros Messages
+from std_msgs.msg import Header
+from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import CompressedImage
+import message_filters
+
+VERBOSE=False
+
+class fusionimage:
+
+    def __init__(self):
+        '''Initialize ros publisher, ros subscriber'''
+        # topic where we publish
+        self.fusion_pub = rospy.Publisher("/wafflefusion/camera/image",
+            CompressedImage,queue_size = 1)
+
+        # subscribed Compressedimage Topic
+        subscriberimage = message_filters.Subscriber("/camera/rgb/image_raw/compressed",CompressedImage)
+        if VERBOSE :
+            print ("subscribed to /camera/rgb/image_raw/compressed")
+        # subscribed Laserscan Topic
+        subscriberlaser = message_filters.Subscriber("/scan", LaserScan)
+        if VERBOSE :
+           
+           print ("subscribed to /scan")
+        #ts = message_filters.TimeSynchronizer([subscriberimage, subscriberlaser], 10)
+        ts = message_filters.ApproximateTimeSynchronizer([subscriberimage, subscriberlaser], 1, 0.1, allow_headerless=True)
+        ts.registerCallback(self.callback)
+    def callback(self,ros_data,msg):
+    
+        '''Callback function of subscribed topic. 
+        Here images get converted and features detected'''
+        if VERBOSE :
+            print ('received image of type: "%s"' )% ros_data.format
+
+
+        np_arr = np.fromstring(ros_data.data, np.uint8)
+        
+        
+####rescale the image (note:cv2.resize is in format of W*H origindim=1920*1080*3)##
+        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        #print image_np.shape
+        
+           
+### convert rescaled image (1080*1920,H*W)image to grayscale
+        
+        image_rescale1 =cv2.resize(cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY),(24,15))
+        image_rescale=image_rescale1.reshape(1,360)
+        #print image_rescale
+        #cv2.imshow('',image_rescale)      
+        #cv2.waitKey(2)
+
+       
+        #print grayimage_np.shape
+        #print image_rescale.shape
+
+        lasermatrix=np.mat(msg.ranges)
+        lasermatrixrange=np.clip(lasermatrix,0.119,3.51)/3.51*255
+        laserm1=lasermatrixrange.astype(np.uint8)
+        laserm=laserm1.reshape(1,360)
+        #print laserm
+        #cv2.imshow('',laserm)      
+        #cv2.waitKey(2) 
+        
+        fusionimage=np.concatenate((laserm*0.9,image_rescale*0.1), axis=1)
+        #axis=1:left+right
+        #fusionimage=np.c_[laserm,image_rescale]
+        
+        #print fusionimage
+        #cv2.imshow('',fusionimage)      
+        #cv2.waitKey(2)  
+      
+
+#### Create CompressedIamge ####
+        msg = CompressedImage()
+        msg.header.stamp = rospy.Time.now()
+        msg.format = "jpeg"
+        msg.data = np.array(cv2.imencode('.jpg', fusionimage)[1]).tostring()
+        # Publish fusion image
+        self.fusion_pub.publish(msg)
+
+def main(args):
+    '''Initializes and cleanup ros node'''
+        
+    rospy.init_node('fusionimage', anonymous=True)
+    ic = fusionimage()
+    
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print ("Shutting down ROS Image feature detector module")
+    cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main(sys.argv)
