@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+import sys,time
+# import ros stuff
+import rospy
+import roslib
+from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import Header
+from PIL import Image
+import matplotlib.pyplot as plt
+
+# numpy 
+import numpy as np
+import cv2
+from scipy.ndimage import filters
+
+VERBOSE=False
+
+class laserimage:
+
+    def __init__(self):
+        '''Initialize ros publisher, ros subscriber'''
+        ###topic where we publish
+        self.laserimage_pub = rospy.Publisher("/wafflelaser/camera/image",
+            CompressedImage,queue_size = 1)
+       
+
+        ### subscribed Topic
+        self.subscriber = rospy.Subscriber("/scan",
+            LaserScan, self.callback, queue_size = 1)
+        if VERBOSE :
+           
+           print ("subscribed to /scan")
+####transfer laser ranges array to matrixs###
+     
+    def callback(self,msg):
+    
+         lasermatrix=np.mat(msg.ranges)
+         lasermatrixrange=np.clip(lasermatrix,0.119,3.51)/3.51*255
+         laserm1=lasermatrixrange.astype(np.uint8)
+         laserm=laserm1.reshape(6,60)
+
+         #print laserm
+         #laserm = cv2.resize(laserm2,(120,75))
+         #cv2.imshow('',laserm)
+         #cv2.waitKey(2)
+
+        #### Create CompressedImage ####
+         msg = CompressedImage()
+         msg.header.stamp = rospy.Time.now()
+         msg.format = "jpeg"
+         msg.data = np.array(cv2.imencode('.jpg', laserm)[1]).tostring()
+        # Publish new image
+         self.laserimage_pub.publish(msg)
+         
+def main(args):
+    '''Initializes and cleanup ros node'''
+    rospy.init_node('laserimage', anonymous=True)
+    ic = laserimage()
+    
+    try:
+       rospy.spin()
+    except KeyboardInterrupt:
+           print ("Shutting down ROS Image feature detector module")
+    cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main(sys.argv)
