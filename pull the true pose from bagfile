@@ -1,0 +1,49 @@
+
+
+
+%%% generate simulation true pose data %%%
+simbag = rosbag('wafflelidarwithvision.bag');
+
+simbagselect = select(simbag, 'Topic', '/wafflefusion/odom');
+
+simmsgs= readMessages(simbagselect);
+
+simbagts = timeseries(simbagselect,'Pose.Pose.Position.X','Pose.Pose.Position.Y','Pose.Pose.Orientation.X','Pose.Pose.Orientation.Y','Pose.Pose.Orientation.Z', 'Pose.Pose.Orientation.W');
+
+simpose = simbagts.Data;
+
+x=simpose(:,1);                 % x-coordinates of true odom
+y=simpose(:,2);                 % y-coordinats of true odom
+oz=simpose(:,[3 4 5 6]);        % get orientation in Quaternion         
+ 
+  
+
+                     
+%%% generate estimated ratslam pose data from showem %%%
+% ratbag = rosbag('ratslam_outlidar.bag');
+% 
+% ratbagselect = select(ratbag, 'Topic', '/wafflelaser/ExperienceMap/RobotPose');
+% 
+% ratmsgs= readMessages(ratbagselect);
+% 
+% ratbagts = timeseries(ratbagselect, 'Pose.Position.X','Pose.Position.Y','Pose.Orientation.Z');
+% 
+% ratpose = ratbagts.Data;
+
+estimatedpose=pose(:,[2 3 5 6 7 8]); 
+
+x1=estimatedpose(:,1);              % estimated x-coordinates
+y1=estimatedpose(:,2);              % estimated y-coordinates
+oz1 =estimatedpose(:,[3 4 5 6]);    % get orientation in Quaternion
+                    
+
+plot(x,y);
+hold on
+plot(x1,y1);
+hold off
+title('Ground Truth vs Estimated Pose');
+xlabel('x[m]');
+ylabel('y[m]');
+legend({'Ground Truth','Estimated Pose'},'Location','northeast');
+axis([-3 7 -3 7]);
+grid on
