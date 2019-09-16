@@ -1,0 +1,48 @@
+
+%%% Produce LOCALIZATION ERROR METRIC （LEM） and ENERGY METRIC (EnM） %%%
+
+%downsample the simulation data, need to be changed regarding to the ratslam data number %%%
+
+dx=resample(x,length(x1),length(x));   % decrease sample number of x coordinate
+dxx=dx;              % match data size
+
+dy=resample(y,length(y1),length(y));   % decrease sample number of y coordinate 
+dyy=dy;             % match data size
+
+doz=resample(oz,length(oz1),length(oz)); % decrease sample number of rotation about z axi
+dozz=doz     ;      % match data size 
+
+ND=size(dxx);         % get the size of array
+N=ND(1);              % get the number of value in array
+
+
+
+%%% Producing Localization Error Metric (LEM) %%%
+
+errorbtx=x1-dxx;     % error between true x and ratslam' x 
+sqex= errorbtx.^2;   % square of the errorx
+
+errorbty=y1-dyy;     % error between true y and ratslam' y
+sqey=errorbty.^2;    % square of the errory
+
+LEMpostion= sqrt(1/N* sum(sqex+sqey));
+
+errorbtoz=oz1-dozz;  % error between true orientation about z and ratslam's z
+
+sqeoz=errorbtoz.^2;  % square of the erroroz
+
+LEMorientation = sqrt(1/N * sum(sum(sqeoz,2)));
+
+%%% Producing Energy Metric (EnM) %%%
+
+%EnM=1/N * sum(((x1-dxx).^2+(y1-dyy).^2).^0.5.^2+sum(sqeoz,2));
+
+number=50;
+tx= diff(downsample(x1,number));
+Nx=length(tx);
+trans=(diff(downsample(x1,number)).^2+diff(downsample(y1,number)).^2)-(diff(downsample(dxx,number)).^2+diff(downsample(dyy,number)).^2);
+
+rotation = sum((diff(downsample(oz1,number))-diff(downsample(dozz,number))).^2,2)  ;
+
+EnM=1/Nx*sum(trans.^2+rotation);             % calcualte EnM value in squared form                                                  
+
